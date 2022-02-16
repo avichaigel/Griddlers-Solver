@@ -10,6 +10,7 @@ NICHE_SIZE = 100
 GENS = 200
 finish_line_reached = False
 rng = default_rng()
+FILE = "16.txt"
 
 ranked = []
 for i in range(POP_SIZE):
@@ -34,7 +35,7 @@ def intialize_pop_gen():
 
 
 def receive_constraints():
-    with open("input_hard.txt") as fp:
+    with open(FILE) as fp:
         data = [list(map(int, line.strip().split(' '))) for line in fp]
         goal = 0
         for list_int in data:

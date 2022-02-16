@@ -5,12 +5,11 @@ from __future__ import print_function
 import numpy as np
 from time import time
 from gurobipy import Model, GRB, quicksum
-import io
+import Parser
 import Plot
 
-CASE_WHITE, CASE_BLACK, CASE_BLANK = -1, 1, 0
+WHITE, BLACK, BLANK = -1, 1, 0
 MODEL_NAME = "lp_griddler_solver"
-DELIMITER = "#\n"
 FILE = "16.txt"
 
 def linear_programming(line_constraints, column_constraints, grid):
@@ -83,12 +82,12 @@ def linear_programming(line_constraints, column_constraints, grid):
     # build the final grid
     for i in range(N):
         for j in range(M):
-            if grid[i, j] == CASE_BLANK:
+            if grid[i, j] == BLANK:
                 values = lx[i, j].x
                 if values < 0 or (values >= 0 and values < .5):
-                    grid[i, j] = CASE_WHITE
+                    grid[i, j] = WHITE
                 else:
-                    grid[i, j] = CASE_BLACK
+                    grid[i, j] = BLACK
 
     return grid, t2 - t1
 
@@ -132,33 +131,13 @@ def possible_cases(sequence, N, M):
         possible_cases.append(L)
     return possible_cases
 
-def parse_instance(file_path):
-    global DELIMITER
-
-    lines, columns = [], []
-    with io.open(file_path, encoding="utf8") as file:
-        for line in file:
-            if line != DELIMITER:
-                lines.append(parse_line(line))
-            else:
-                break
-        for line in file:
-            columns.append(parse_line(line))
-    return lines, columns
-
-def parse_line(line):
-    """ Parses a line containing integers separated by a space, or an
-     empty line, then returns a list of integers, or an empty list.
-    """
-    return list(map(int, line.split()))
-
 def solve(line_constraints, column_constraints, grid):
     grid, execution_time = linear_programming(line_constraints, column_constraints, grid)
     return grid, execution_time
 
 if __name__ == '__main__':
-    line_constraints, column_constraints = parse_instance(FILE)
-    grid = np.full((len(line_constraints), len(column_constraints)), CASE_BLANK)
+    line_constraints, column_constraints = Parser.parse_instance(FILE)
+    grid = np.full((len(line_constraints), len(column_constraints)), BLANK)
     grid, execution_time = solve(line_constraints, column_constraints, grid)
     print("solution found in " + str(execution_time) + " seconds")
     Plot.plot_grid(grid, FILE)
