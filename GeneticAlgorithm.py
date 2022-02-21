@@ -228,17 +228,17 @@ def start(file):
 
         if optimal_solution_found:
             break
-        if generation % 20 == 0:
+        if generation % 20 == 0 and generation != TOTAL_GENS:
             pop_all_in = np.concatenate(niches)
             for k in range(2):
                 pop_all_in, best_in_niche[NICHE_NUM], fittest_sols[NICHE_NUM] = create_new_gen(pop_all_in, constraints, finish_line)
                 cur_fittest = np.argmax(np.asarray(best_in_niche))
-                print("best solution: {:.2%}".format(best_in_niche[cur_fittest] / finish_line))
+                print("best solution: {:.3%}".format(best_in_niche[cur_fittest] / finish_line))
                 generation += 1
                 print("generation: " + str(generation) + "\n")
             np.random.shuffle(pop_all_in)
             divide_to_niches = True
 
     end = time()
-    print("solution found in {:.2} seconds".format(str((end - start))))
+    print("solution found in {:.3} seconds".format(str(end - start)))
     Plot.plot_grid(fittest_sols[cur_fittest][0], file)

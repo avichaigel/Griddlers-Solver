@@ -19,7 +19,7 @@ while not stop:
     if chosen_alg == '1':
         solver = LinearProgramming
         solver_name = 'Linear Programming'
-    else:
+    else:  # chosen_alg == '2'
         solver = GeneticAlgorithm
         solver_name = 'Genetic Algorithm'
 
@@ -37,5 +37,5 @@ while not stop:
     print("Solving " + level_name + " level Griddler with " + solver_name)
     solver.start(file)
 
-    stop_choice = input("To solve another puzzle enter 1, to exit enter 0")
+    stop_choice = input("\nTo solve another puzzle enter 1, to exit enter 0")
     stop = True if stop_choice == '0' else False
