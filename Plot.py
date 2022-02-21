@@ -1,4 +1,3 @@
-from __future__ import print_function
 import pylab as plt
 from  matplotlib.patches import  Rectangle
 from matplotlib.collections import PatchCollection
@@ -16,7 +15,7 @@ def plot_grid(grid, title):
     plt.axis([0, len(grid[0]), n, 0])
     plt.suptitle(title, fontsize=24)
 
-    # Black squares in prohibited boxes
+    # Draw
     CN = []
     CB = []
     CG = []
@@ -24,9 +23,9 @@ def plot_grid(grid, title):
         for j in range(len(grid[i])):
             if grid[i][j] == 1:
                 CN.append(Rectangle((j, i), 1, 1, color="black"))
-            elif grid[i][j] == -1:
-                CB.append(Rectangle((j, i), 1, 1, color="white"))
             elif grid[i][j] == 0:
+                CB.append(Rectangle((j, i), 1, 1, color="white"))
+            elif grid[i][j] == -1:
                 CG.append(Rectangle((j, i), 1, 1, color="grey"))
     if CN != []:
         graph.add_collection(PatchCollection(CN, match_original=True))
@@ -35,7 +34,3 @@ def plot_grid(grid, title):
     if CG != []:
         graph.add_collection(PatchCollection(CG, match_original=True))
     plt.show()
-
-
-if __name__ == '__main__':
-    pass

@@ -8,9 +8,9 @@ from gurobipy import Model, GRB, quicksum
 import Parser
 import Plot
 
-WHITE, BLACK, BLANK = -1, 1, 0
+WHITE, BLACK, BLANK = 0, 1, -1
 MODEL_NAME = "lp_griddler_solver"
-FILE = "16.txt"
+FILE = "hard-bells.txt"
 
 def linear_programming(line_constraints, column_constraints, grid):
     global MODEL_NAME
@@ -139,5 +139,5 @@ if __name__ == '__main__':
     line_constraints, column_constraints = Parser.parse_instance(FILE)
     grid = np.full((len(line_constraints), len(column_constraints)), BLANK)
     grid, execution_time = solve(line_constraints, column_constraints, grid)
-    print("solution found in " + str(execution_time) + " seconds")
+    print("solution found in {:.2} seconds".format(execution_time))
     Plot.plot_grid(grid, FILE)

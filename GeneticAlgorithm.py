@@ -2,15 +2,18 @@ import numpy as np
 import random
 from numpy.random import default_rng
 import math
-import sys
 from time import time
 
-POP_SIZE = 500
-NICHE_SIZE = 100
-GENS = 200
-finish_line_reached = False
+import Plot
+
+DELIMITER = "#\n"
+POP_SIZE = 1000
+NICHE_NUM = 5
+NICHE_SIZE = POP_SIZE//NICHE_NUM
+TOTAL_GENS = 100
+optimal_solution_found = False
 rng = default_rng()
-FILE = "16.txt"
+FILE = "hard-bells.txt"
 
 ranked = []
 for i in range(POP_SIZE):
@@ -21,38 +24,53 @@ for n in range(NICHE_SIZE):
     for m in range(n + 1):
         niche_ranked.append(n)
 
-def intialize_pop_gen():
+
+def receive_constraints():
+    with open(FILE) as fp:
+        constraints = {}
+        row_num = col_num = goal = 0
+        for line in fp:
+            if line != DELIMITER:
+                row_num, constraints, goal = add_constraint(row_num, line, constraints, goal, 'row')
+            else:
+                break
+        for line in fp:
+            col_num, constraints, goal = add_constraint(col_num,line,constraints,goal, 'col')
+    return constraints, goal, row_num, col_num
+
+
+def add_constraint(row_or_col_num, line, constraints, goal, row_or_col):
+    row_or_col_num += 1
+    list_int = list(map(int, line.split(' ')))
+    constraints[row_or_col + str(row_or_col_num)] = np.asarray(list_int)
+    goal += sum(x > 0 for x in list_int)
+    return row_or_col_num, constraints, goal
+
+
+def intialize_pop_gen(constraints):
     i = 0
     pop_holder = np.ndarray(POP_SIZE, dtype=object)
     while i < POP_SIZE:
-        random_number_of_ones = np.random.randint(0, 626)
-        matrix = np.zeros((25, 25))
-        indices_to_change = np.random.choice(matrix.size, random_number_of_ones, replace=False)
-        matrix.ravel()[indices_to_change] = 1
+        # for every row, set x 1's in random places in the row
+        # where x is the number of 1's that are supposed to be in that row
+        matrix = np.zeros((row_num, col_num))
+        for j in range(row_num):
+            row_constraints = constraints["row" + str(j + 1)]
+            number_of_ones = np.sum(row_constraints)
+            row = matrix[j]
+            indices_to_change = np.random.choice(row.size, number_of_ones, replace=False)
+            row.ravel()[indices_to_change] = 1
         pop_holder[i] = [matrix.astype(int), 0]
         i += 1
     return pop_holder
 
 
-def receive_constraints():
-    with open(FILE) as fp:
-        data = [list(map(int, line.strip().split(' '))) for line in fp]
-        goal = 0
-        for list_int in data:
-            goal += sum(x > 0 for x in list_int)
-        constraints = {}
-        for i in range(25):
-            constraints['col' + str(i + 1)] = np.asarray(data[i])
-        for j in range(25, len(data)):
-            constraints['row' + str((j - 25) + 1)] = np.asarray(data[j])
-    return constraints, goal
-
-
-def fitness_by_col(solution, col, num_of_col):
+def fit(sequence, sequence_constr, row_or_col):
     fill_black_counter = 0
     built_in_constrain = []
-    for i in range(25):
-        if solution[i][num_of_col] == 0:
+    length = row_num if row_or_col == 'col' else col_num
+    for i in range(length):
+        if sequence[i] == 0:
             if fill_black_counter > 0:
                 built_in_constrain.append(fill_black_counter)
                 fill_black_counter = 0
@@ -63,81 +81,62 @@ def fitness_by_col(solution, col, num_of_col):
         built_in_constrain.append(fill_black_counter)
 
     built_in_constrain = np.asarray(built_in_constrain)
-    col = col[col != 0]
+    sequence_constr = sequence_constr[sequence_constr != 0]
 
     # with order without zeros
     order_fitness_score = 0
-    for n, m in zip(col, built_in_constrain):
+    for n, m in zip(sequence_constr, built_in_constrain):
         if n == m:
             order_fitness_score += 1
 
     return order_fitness_score
 
 
-def fitness_by_row(solution, row, num_of_row):
-    fill_black_counter = 0
-    built_in_constrain = []
-    for j in range(25):
-        if solution[num_of_row][j] == 0:
-            if fill_black_counter > 0:
-                built_in_constrain.append(fill_black_counter)
-                fill_black_counter = 0
-            continue
-        else:
-            fill_black_counter += 1
-    if fill_black_counter > 0:
-        built_in_constrain.append(fill_black_counter)
-
-    built_in_constrain = np.asarray(built_in_constrain)
-    row = row[row != 0]
-    order_fitness_score = 0
-    # with order without zeros
-    for n, m in zip(row, built_in_constrain):
-        if n == m:
-            order_fitness_score += 1
-
-    return order_fitness_score
-
-
-def fitness_function(pop, dic_of_constrain, goal_to_reach):
-    global finish_line_reached
+def fitness_function(pop, constraints_dict, fitness_goal):
+    global optimal_solution_found
     for s in range(len(pop)):
-        solution_to_fit = pop[s][0]
+        solution = pop[s][0]
         fitness_score = 0
-        for l in range(25):
-            sub_fit_by_col = fitness_by_col(solution_to_fit, dic_of_constrain["col" + str(l + 1)], l)
-            sub_fit_by_row = fitness_by_row(solution_to_fit, dic_of_constrain["row" + str(l + 1)], l)
-            fitness_score += (sub_fit_by_col + sub_fit_by_row)
+        for row in range(row_num):
+            sub_fit_by_row = fit(solution[row], constraints_dict["row" + str(row + 1)], 'row')
+            fitness_score += sub_fit_by_row
+        for col in range(col_num):
+            sub_fit_by_col = fit((np.transpose(solution))[col], constraints_dict["col" + str(col + 1)], 'col')
+            fitness_score += sub_fit_by_col
         pop[s][1] = fitness_score
-        if fitness_score == goal_to_reach:
-            finish_line_reached = True
+        if fitness_score == fitness_goal:
+            optimal_solution_found = True
     return pop
 
 
 def crossover(parent1, parent2):
-    # crossover rate is 80%
-    child1, child2 = np.zeros((25, 25), dtype=int), np.zeros((25, 25), dtype=int)
-    if random.random() < 0.80:
-        for i in range(25):
-            for j in range(25):
-                if random.random() < 0.5:
-                    child1[i][j] = parent1[i][j]
-                else:
-                    child1[i][j] = parent2[i][j]
-
-                if random.random() < 0.5:
-                    child2[i][j] = parent1[i][j]
-                else:
-                    child2[i][j] = parent2[i][j]
+    child1, child2 = np.zeros((row_num, col_num), dtype=int), np.zeros((row_num, col_num), dtype=int)
+    # crossover rate is 99%
+    rand = random.random()
+    if rand < 1:
+        for i in range(row_num):
+            for j in range(col_num):
+                get_bit_from_parent(i, j, child1, parent1, parent2)
+                get_bit_from_parent(i, j, child2, parent1, parent2)
     else:
         child1, child2 = parent1, parent2
     return child1, child2
 
 
+def get_bit_from_parent(i, j, child, parent1, parent2):
+    # uniform crossover - every bit is chosen randomly from either one of the parents
+    if random.random() < 0.5:
+        child[i][j] = parent1[i][j]
+    else:
+        child[i][j] = parent2[i][j]
+
+
 def mutate(child):
+    # 4% of bits will be mutated
+    mutation_percent = int((row_num*col_num)*0.04)
     # mutation rate is 5%
     if np.random.randint(20) == 1:
-        indices_to_change = np.random.choice(child.size, 26, replace=False)
+        indices_to_change = np.random.choice(child.size, mutation_percent, replace=False)
         for index in indices_to_change:
             child.ravel()[index] = 1 if child.ravel()[index] == 0 else 0
     return child
@@ -153,17 +152,18 @@ def new_gen(pre_pop):
     sorted_prev_pop = np.asarray(sorted(pre_pop, key=lambda t: t[1]), dtype=object)
     counter = 0
     # first we are going to preform elitism, by inserting top k solution to new_pop_holder
-    # also we are going to delete them from the pre_pop as we leave them untouched
-    number_of_elitism = int(pre_pop.size / 50)
+    number_of_elitism = int(pre_pop.size / (row_num+col_num))
     while number_of_elitism != 0:
         new_pop_holder[counter] = sorted_prev_pop[len(sorted_prev_pop) - math.ceil(number_of_elitism / 2)]
         sorted_prev_pop[len(sorted_prev_pop) - math.ceil(number_of_elitism / 2)] = sorted_prev_pop[
             len(sorted_prev_pop) - number_of_elitism]
         number_of_elitism -= 1
         counter += 1
+
+    # create the rest of the new generation
     while counter != pre_pop.size:
         # pick randomly 2 solutions for crossover and mutation
-        random_indexes1, random_indexes2 = ranked_build_on_fitness(pre_pop.size)
+        random_indexes1, random_indexes2 = ranked_by_fitness(pre_pop.size)
         parent_sol1 = sorted_prev_pop[random_indexes1]
         parent_sol2 = sorted_prev_pop[random_indexes2]
         crossover_child1, crossover_child2 = crossover(parent_sol1[0], parent_sol2[0])
@@ -174,11 +174,10 @@ def new_gen(pre_pop):
             break
         new_pop_holder[counter] = [mut_child2, 0]
         counter += 1
-    # not forgetting that there is an option, just to copy solutions as is
-    return new_pop_holder, sorted_prev_pop[len(sorted_prev_pop) - 1][1]
+    return new_pop_holder, sorted_prev_pop[len(sorted_prev_pop) - 1][1], sorted_prev_pop[len(sorted_prev_pop) - 1]
 
 
-def ranked_build_on_fitness(pop_size):
+def ranked_by_fitness(pop_size):
     ranked_fit = []
     if pop_size == NICHE_SIZE:
         ranked_fit = niche_ranked
@@ -188,92 +187,55 @@ def ranked_build_on_fitness(pop_size):
     return ranked_fit[place[0]], ranked_fit[place[1]]
 
 
-def opt(pop, constraints):
-    new_fitness_score = 0
-    for s in range(len(pop)):
-        solution_to_fit = np.copy(pop[s][0])
-        fitness_compare = np.copy(pop[s][1])
-        indices_to_opt = np.random.choice(solution_to_fit.size, 25, replace=False)
-        for index in indices_to_opt:
-            solution_to_fit.ravel()[index] = 1 if solution_to_fit.ravel()[index] == 0 else 0
-            row_num = index // 25
-            col_num = index % 25
-            cur_row_fitness = fitness_by_row(pop[s][0], constraints["row" + str(row_num + 1)], row_num)
-            cur_col_fitness = fitness_by_col(pop[s][0], constraints["col" + str(col_num + 1)], col_num)
-            sub_fit_by_col = fitness_by_col(solution_to_fit, constraints["col" + str(row_num + 1)], row_num)
-            sub_fit_by_row = fitness_by_row(solution_to_fit, constraints["row" + str(col_num + 1)], col_num)
-            if sub_fit_by_col > cur_col_fitness:
-                pop[s][0] = solution_to_fit
-                pop[s][1] = fitness_compare + (sub_fit_by_col - cur_col_fitness)
-                break
-            elif sub_fit_by_row > cur_row_fitness:
-                pop[s][0] = solution_to_fit
-                pop[s][1] = fitness_compare + (sub_fit_by_row - cur_row_fitness)
-                break
-    return pop
-
-
 def Regular_new_gen(population, constraints, finish_line):
     population = fitness_function(population, constraints, finish_line)
-    population, best_fit = new_gen(population)
-    return population, best_fit
+    population, best_fit, fittest_sol = new_gen(population)
+    return population, best_fit, fittest_sol
 
 
-def Darwin_new_gen(population, constraints, finish_line):
-    population = fitness_function(population, constraints, finish_line)
-    population, best_fit = new_gen(population)
-    population = opt(population, constraints)
-    return population, best_fit
-
-
-def Lamark_new_gen(population, constraints, finish_line):
-    population = fitness_function(population, constraints, finish_line)
-    population = opt(population, constraints)
-    population, best_fit = new_gen(population)
-    return population, best_fit
-
+constraints, finish_line, row_num, col_num = receive_constraints()
+population = intialize_pop_gen(constraints)
+generation = 0
+divide_to_niches = False
+np.random.shuffle(population)
+pop_all_in = []
+best_in_niche = [0 for i in range(NICHE_NUM+1)]
+fittest_sols = [0 for i in range(NICHE_NUM+1)]
+niches = [[] for i in range(NICHE_NUM)]
 
 start = time()
-constraints, finish_line = receive_constraints()
-population = intialize_pop_gen()
-num_of_gen = 0
-flag_for_niching = 0
-np.random.shuffle(population)
-pop_all_in, niche1, niche2, niche3, niche4, niche5, = [],[],[],[],[],[]
-# while num_of_gen < GENS:
-while not finish_line_reached:
-    if num_of_gen == 0:
-        niche1 = population[0:NICHE_SIZE]
-        niche2 = population[NICHE_SIZE:2*NICHE_SIZE]
-        niche3 = population[2*NICHE_SIZE:3*NICHE_SIZE]
-        niche4 = population[3*NICHE_SIZE:4*NICHE_SIZE]
-        niche5 = population[4*NICHE_SIZE:5*NICHE_SIZE]
-    elif flag_for_niching == 1:
-        niche1 = pop_all_in[0:NICHE_SIZE]
-        niche2 = pop_all_in[NICHE_SIZE:2*NICHE_SIZE]
-        niche3 = pop_all_in[2*NICHE_SIZE:3*NICHE_SIZE]
-        niche4 = pop_all_in[3*NICHE_SIZE:4*NICHE_SIZE]
-        niche5 = pop_all_in[4*NICHE_SIZE:5*NICHE_SIZE]
-        flag_for_niching = 0
-    niche1, best1 = Regular_new_gen(niche1, constraints, finish_line)
-    niche2, best2 = Regular_new_gen(niche2, constraints, finish_line)
-    niche3, best3 = Regular_new_gen(niche3, constraints, finish_line)
-    niche4, best4 = Regular_new_gen(niche4, constraints, finish_line)
-    niche5, best5 = Regular_new_gen(niche5, constraints, finish_line)
-    print("best fit: " + str(100*np.asarray([best1, best2, best3, best4, best5]).max()/finish_line) + '%')
-    num_of_gen += 1
-    print("gen: " + str(num_of_gen))
-    print("")
-    # if finish_line_reached:
-    #     break
-    if num_of_gen % 50 == 0:
-        pop_all_in = np.concatenate((niche1, niche2, niche3, niche4, niche5))
-        for_100_gen = num_of_gen
-        while num_of_gen != for_100_gen + 2:
-            pop_all_in, best6 = Regular_new_gen(pop_all_in, constraints, finish_line)
-            np.random.shuffle(pop_all_in)
-            num_of_gen += 1
-        flag_for_niching = 1
+while generation < TOTAL_GENS:
+# while not optimal_solution_found:
+    if generation == 0:
+        for i in range(NICHE_NUM):
+            niches[i] = population[NICHE_SIZE*i:NICHE_SIZE*(i+1)]
+    elif divide_to_niches:
+        for j in range(NICHE_NUM):
+            niches[j] = pop_all_in[NICHE_SIZE * j:NICHE_SIZE * (j + 1)]
+        divide_to_niches = False
+    for k in range(NICHE_NUM):
+        niches[k], best_in_niche[k], fittest_sols[k] = Regular_new_gen(niches[k], constraints, finish_line)
+    cur_fittest = np.argmax(np.asarray(best_in_niche))
+    # population, best, fittest_sol = Regular_new_gen(population, constraints, finish_line)
+    # cur_fittest = fittest_sol
+    # print("best solution: {:.2%}".format(best / finish_line))
+    print("best solution: {:.2%}".format(best_in_niche[cur_fittest] / finish_line))
+    generation += 1
+    print("generation: " + str(generation) + "\n")
+
+    if optimal_solution_found:
+        break
+    if generation % 20 == 0:
+        pop_all_in = np.concatenate(niches)
+        for k in range(2):
+            pop_all_in, best_in_niche[NICHE_NUM], fittest_sols[NICHE_NUM] = Regular_new_gen(pop_all_in, constraints, finish_line)
+            cur_fittest = np.argmax(np.asarray(best_in_niche))
+            print("best solution: {:.2%}".format(best_in_niche[cur_fittest] / finish_line))
+            generation += 1
+            print("generation: " + str(generation) + "\n")
+        np.random.shuffle(pop_all_in)
+        divide_to_niches = True
 
 end = time()
-print("solution found in " + str((start - end)) + " seconds")
+print("solution found in {:.2} seconds".format(str((end - start))))
+Plot.plot_grid(fittest_sols[cur_fittest][0], FILE)
