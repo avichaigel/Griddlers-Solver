@@ -24,19 +24,16 @@ def linear_programming(line_constraints, column_constraints, grid):
     authorized_Y = possible_cases(line_constraints, N, M)
     authorized_Z = possible_cases(column_constraints, M, N)
 
-    # Variables type 1 X i,j
+    # Variables
     lx = np.array([[model.addVar(vtype=GRB.BINARY) for j in range(M)] for i in range(N)])
 
-    # Variables type 2 Y i,j,t
     ly = np.array([[[model.addVar(vtype=GRB.BINARY) if j in authorized_Y[i][t] else None
                         for t in range(len(line_constraints[i]))] for j in range(M)] for i in range(N)],dtype=object)
 
-    # Variables type 2 Z i,j,t
     lz = np.array([[[model.addVar(vtype=GRB.BINARY) if i in authorized_Z[j][t] else None
                         for t in range(len(column_constraints[j]))] for i in range(N)] for j in range(M)],dtype=object)
 
     # Add constraints to model
-    # line constraints
     for i in range(N):
         for t in range(len(line_constraints[i])):
             l1 = [ly[i, k][t] for k in range(M) if ly[i, k][t]]
@@ -66,7 +63,6 @@ def linear_programming(line_constraints, column_constraints, grid):
                     if len(l1) > 0:
                         model.addConstr(column_constraints[j][t] * lz[j, i][t] <= quicksum(keyx for keyx in l1))
 
-    # column constraints
     for j in range(M):
         for t in range(len(column_constraints[j])):
             l1 = [lz[j, i][t] for i in range(N) if lz[j, i][t]]

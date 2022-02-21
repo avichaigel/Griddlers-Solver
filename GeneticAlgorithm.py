@@ -16,6 +16,7 @@ rng = default_rng()
 row_num = 0
 col_num = 0
 
+# create rank lists, for the selection process
 ranked = []
 for i in range(POP_SIZE):
     for j in range(i + 1):
@@ -26,6 +27,7 @@ for n in range(NICHE_SIZE):
         niche_ranked.append(n)
 
 
+# turn the constraints from the file into dictionaries
 def receive_constraints(file):
     with open(file) as fp:
         constraints = {}
@@ -40,6 +42,7 @@ def receive_constraints(file):
     return constraints, goal, row_num, col_num
 
 
+# helper function for the constraint dictionary creation
 def add_constraint(row_or_col_num, line, constraints, goal, row_or_col):
     row_or_col_num += 1
     list_int = list(map(int, line.split(' ')))
@@ -48,7 +51,8 @@ def add_constraint(row_or_col_num, line, constraints, goal, row_or_col):
     return row_or_col_num, constraints, goal
 
 
-def intialize_pop_gen(constraints):
+# initialize population
+def init_population(constraints):
     i = 0
     pop_holder = np.ndarray(POP_SIZE, dtype=object)
     while i < POP_SIZE:
@@ -66,6 +70,8 @@ def intialize_pop_gen(constraints):
     return pop_holder
 
 
+# give a fitness score to the given sequence (row or column) based on how many
+# constraints it fills
 def fit(sequence, sequence_constr, row_or_col):
     fill_black_counter = 0
     built_in_constrain = []
@@ -93,6 +99,8 @@ def fit(sequence, sequence_constr, row_or_col):
     return order_fitness_score
 
 
+# give a fitness function to every solution in the population
+# based on the sum of the fitness scores it has for every row and column
 def fitness_function(pop, constraints_dict, fitness_goal):
     global optimal_solution_found
     for s in range(len(pop)):
@@ -148,6 +156,7 @@ def mutation(child1, child2):
     return child1, child2
 
 
+# create new generation - elitism, selection, crossover and mutation
 def new_gen(pre_pop):
     new_pop_holder = np.ndarray(pre_pop.size, dtype=object)
     sorted_prev_pop = np.asarray(sorted(pre_pop, key=lambda t: t[1]), dtype=object)
@@ -193,10 +202,11 @@ def create_new_gen(population, constraints, finish_line):
     return population, best_fit, fittest_sol
 
 
+
 def start(file):
     global row_num, col_num
     constraints, finish_line, row_num, col_num = receive_constraints(file)
-    population = intialize_pop_gen(constraints)
+    population = init_population(constraints)
     generation = 0
     divide_to_niches = False
     np.random.shuffle(population)
@@ -207,8 +217,9 @@ def start(file):
 
     print("The algorithm will run a maximum of " + str(TOTAL_GENS) + " generations")
     start = time()
+    # run for TOTAL_GENS generations, or until optimal solution is found
     while generation < TOTAL_GENS:
-    # while not optimal_solution_found:
+        # divide the population into niches
         if generation == 0:
             for i in range(NICHE_NUM):
                 niches[i] = population[NICHE_SIZE*i:NICHE_SIZE*(i+1)]
@@ -216,18 +227,20 @@ def start(file):
             for j in range(NICHE_NUM):
                 niches[j] = pop_all_in[NICHE_SIZE * j:NICHE_SIZE * (j + 1)]
             divide_to_niches = False
+
+        # create new generation and for every niche save the best solution
         for k in range(NICHE_NUM):
             niches[k], best_in_niche[k], fittest_sols[k] = create_new_gen(niches[k], constraints, finish_line)
         cur_fittest = np.argmax(np.asarray(best_in_niche))
-        # population, best, fittest_sol = Regular_new_gen(population, constraints, finish_line)
-        # cur_fittest = fittest_sol
-        # print("best solution: {:.2%}".format(best / finish_line))
+
         print("best solution: {:.2%}".format(best_in_niche[cur_fittest] / finish_line))
         generation += 1
         print("generation: " + str(generation) + "\n")
 
         if optimal_solution_found:
             break
+
+        # combine all niches into one population and create 2 new generations
         if generation % 20 == 0 and generation != TOTAL_GENS:
             pop_all_in = np.concatenate(niches)
             for k in range(2):
