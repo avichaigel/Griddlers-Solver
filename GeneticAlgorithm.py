@@ -13,7 +13,8 @@ NICHE_SIZE = POP_SIZE//NICHE_NUM
 TOTAL_GENS = 100
 optimal_solution_found = False
 rng = default_rng()
-FILE = "hard-bells.txt"
+row_num = 0
+col_num = 0
 
 ranked = []
 for i in range(POP_SIZE):
@@ -25,8 +26,8 @@ for n in range(NICHE_SIZE):
         niche_ranked.append(n)
 
 
-def receive_constraints():
-    with open(FILE) as fp:
+def receive_constraints(file):
+    with open(file) as fp:
         constraints = {}
         row_num = col_num = goal = 0
         for line in fp:
@@ -178,7 +179,6 @@ def new_gen(pre_pop):
 
 
 def ranked_by_fitness(pop_size):
-    ranked_fit = []
     if pop_size == NICHE_SIZE:
         ranked_fit = niche_ranked
     else:
@@ -187,55 +187,58 @@ def ranked_by_fitness(pop_size):
     return ranked_fit[place[0]], ranked_fit[place[1]]
 
 
-def Regular_new_gen(population, constraints, finish_line):
+def create_new_gen(population, constraints, finish_line):
     population = fitness_function(population, constraints, finish_line)
     population, best_fit, fittest_sol = new_gen(population)
     return population, best_fit, fittest_sol
 
 
-constraints, finish_line, row_num, col_num = receive_constraints()
-population = intialize_pop_gen(constraints)
-generation = 0
-divide_to_niches = False
-np.random.shuffle(population)
-pop_all_in = []
-best_in_niche = [0 for i in range(NICHE_NUM+1)]
-fittest_sols = [0 for i in range(NICHE_NUM+1)]
-niches = [[] for i in range(NICHE_NUM)]
+def start(file):
+    global row_num, col_num
+    constraints, finish_line, row_num, col_num = receive_constraints(file)
+    population = intialize_pop_gen(constraints)
+    generation = 0
+    divide_to_niches = False
+    np.random.shuffle(population)
+    pop_all_in = []
+    best_in_niche = [0 for i in range(NICHE_NUM+1)]
+    fittest_sols = [0 for i in range(NICHE_NUM+1)]
+    niches = [[] for i in range(NICHE_NUM)]
 
-start = time()
-while generation < TOTAL_GENS:
-# while not optimal_solution_found:
-    if generation == 0:
-        for i in range(NICHE_NUM):
-            niches[i] = population[NICHE_SIZE*i:NICHE_SIZE*(i+1)]
-    elif divide_to_niches:
-        for j in range(NICHE_NUM):
-            niches[j] = pop_all_in[NICHE_SIZE * j:NICHE_SIZE * (j + 1)]
-        divide_to_niches = False
-    for k in range(NICHE_NUM):
-        niches[k], best_in_niche[k], fittest_sols[k] = Regular_new_gen(niches[k], constraints, finish_line)
-    cur_fittest = np.argmax(np.asarray(best_in_niche))
-    # population, best, fittest_sol = Regular_new_gen(population, constraints, finish_line)
-    # cur_fittest = fittest_sol
-    # print("best solution: {:.2%}".format(best / finish_line))
-    print("best solution: {:.2%}".format(best_in_niche[cur_fittest] / finish_line))
-    generation += 1
-    print("generation: " + str(generation) + "\n")
+    print("The algorithm will run a maximum of " + str(TOTAL_GENS) + " generations")
+    start = time()
+    while generation < TOTAL_GENS:
+    # while not optimal_solution_found:
+        if generation == 0:
+            for i in range(NICHE_NUM):
+                niches[i] = population[NICHE_SIZE*i:NICHE_SIZE*(i+1)]
+        elif divide_to_niches:
+            for j in range(NICHE_NUM):
+                niches[j] = pop_all_in[NICHE_SIZE * j:NICHE_SIZE * (j + 1)]
+            divide_to_niches = False
+        for k in range(NICHE_NUM):
+            niches[k], best_in_niche[k], fittest_sols[k] = create_new_gen(niches[k], constraints, finish_line)
+        cur_fittest = np.argmax(np.asarray(best_in_niche))
+        # population, best, fittest_sol = Regular_new_gen(population, constraints, finish_line)
+        # cur_fittest = fittest_sol
+        # print("best solution: {:.2%}".format(best / finish_line))
+        print("best solution: {:.2%}".format(best_in_niche[cur_fittest] / finish_line))
+        generation += 1
+        print("generation: " + str(generation) + "\n")
 
-    if optimal_solution_found:
-        break
-    if generation % 20 == 0:
-        pop_all_in = np.concatenate(niches)
-        for k in range(2):
-            pop_all_in, best_in_niche[NICHE_NUM], fittest_sols[NICHE_NUM] = Regular_new_gen(pop_all_in, constraints, finish_line)
-            cur_fittest = np.argmax(np.asarray(best_in_niche))
-            print("best solution: {:.2%}".format(best_in_niche[cur_fittest] / finish_line))
-            generation += 1
-            print("generation: " + str(generation) + "\n")
-        np.random.shuffle(pop_all_in)
-        divide_to_niches = True
+        if optimal_solution_found:
+            break
+        if generation % 20 == 0:
+            pop_all_in = np.concatenate(niches)
+            for k in range(2):
+                pop_all_in, best_in_niche[NICHE_NUM], fittest_sols[NICHE_NUM] = create_new_gen(pop_all_in, constraints, finish_line)
+                cur_fittest = np.argmax(np.asarray(best_in_niche))
+                print("best solution: {:.2%}".format(best_in_niche[cur_fittest] / finish_line))
+                generation += 1
+                print("generation: " + str(generation) + "\n")
+            np.random.shuffle(pop_all_in)
+            divide_to_niches = True
 
-end = time()
-print("solution found in {:.2} seconds".format(str((end - start))))
-Plot.plot_grid(fittest_sols[cur_fittest][0], FILE)
+    end = time()
+    print("solution found in {:.2} seconds".format(str((end - start))))
+    Plot.plot_grid(fittest_sols[cur_fittest][0], file)

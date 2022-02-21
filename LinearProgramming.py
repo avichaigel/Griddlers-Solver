@@ -10,7 +10,7 @@ import Plot
 
 WHITE, BLACK, BLANK = 0, 1, -1
 MODEL_NAME = "lp_griddler_solver"
-FILE = "hard-bells.txt"
+
 
 def linear_programming(line_constraints, column_constraints, grid):
     global MODEL_NAME
@@ -91,10 +91,8 @@ def linear_programming(line_constraints, column_constraints, grid):
 
     return grid, t2 - t1
 
+# Returns the list of possible boxes for each block of the N lines over M columns.
 def possible_cases(sequence, N, M):
-    """
-    Returns the list of possible boxes for each block of the N lines over M columns.
-    """
     possible_cases = []
     for i in range(N):
         L = []
@@ -131,13 +129,15 @@ def possible_cases(sequence, N, M):
         possible_cases.append(L)
     return possible_cases
 
+
 def solve(line_constraints, column_constraints, grid):
     grid, execution_time = linear_programming(line_constraints, column_constraints, grid)
     return grid, execution_time
 
-if __name__ == '__main__':
-    line_constraints, column_constraints = Parser.parse_instance(FILE)
+
+def start(file):
+    line_constraints, column_constraints = Parser.parse_instance(file)
     grid = np.full((len(line_constraints), len(column_constraints)), BLANK)
     grid, execution_time = solve(line_constraints, column_constraints, grid)
     print("solution found in {:.2} seconds".format(execution_time))
-    Plot.plot_grid(grid, FILE)
+    Plot.plot_grid(grid, file)
