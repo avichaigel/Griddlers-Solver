@@ -12,46 +12,49 @@ WHITE, BLACK, BLANK = 0, 1, -1
 MODEL_NAME = "lp_griddler_solver"
 
 
-def linear_programming(line_constraints, column_constraints, grid):
+def linear_programming(row_constraints, column_constraints, grid):
     global MODEL_NAME
 
-    # Declaration
-    N, M, = len(line_constraints), len(column_constraints)
+    # Declaration of rows and columns
+    N, M, = len(row_constraints), len(column_constraints)
+
     model = Model(MODEL_NAME)
     model.setParam('OutputFlag', False)
 
     # Calculation of possible boxes (boxes that can be blacked out)
-    authorized_Y = possible_cases(line_constraints, N, M)
+    authorized_Y = possible_cases(row_constraints, N, M)
     authorized_Z = possible_cases(column_constraints, M, N)
 
     # Variables
     lx = np.array([[model.addVar(vtype=GRB.BINARY) for j in range(M)] for i in range(N)])
 
     ly = np.array([[[model.addVar(vtype=GRB.BINARY) if j in authorized_Y[i][t] else None
-                        for t in range(len(line_constraints[i]))] for j in range(M)] for i in range(N)],dtype=object)
+                     for t in range(len(row_constraints[i]))] for j in range(M)] for i in range(N)], dtype=object)
 
     lz = np.array([[[model.addVar(vtype=GRB.BINARY) if i in authorized_Z[j][t] else None
                         for t in range(len(column_constraints[j]))] for i in range(N)] for j in range(M)],dtype=object)
 
     # Add constraints to model
+    # rows:
+    # Y ijt =1 0<=j < M a block starts at a single box
     for i in range(N):
-        for t in range(len(line_constraints[i])):
+        for t in range(len(row_constraints[i])):
             l1 = [ly[i, k][t] for k in range(M) if ly[i, k][t]]
             if len(l1) > 0:
                 model.addConstr(quicksum(key1 for key1 in l1), GRB.EQUAL, 1)
 
     for i in range(N):
         for j in range(M):
-            for t in range(len(line_constraints[i])):
+            for t in range(len(row_constraints[i])):
                 if ly[i, j][t]:
                     l1 = []
-                    for t1 in range(t + 1, len(line_constraints[i])):
-                        l1 += [ly[i, k][t1] for k in range(j + line_constraints[i][t] + 1) if k < M and ly[i, k][t1]]
+                    for t1 in range(t + 1, len(row_constraints[i])):
+                        l1 += [ly[i, k][t1] for k in range(j + row_constraints[i][t] + 1) if k < M and ly[i, k][t1]]
                     if len(l1) > 0:
                         model.addConstr(len(l1) * ly[i, j][t] + quicksum(keyy for keyy in l1) <= len(l1))
-                    l1 = [lx[i, k] for k in range(j, j + line_constraints[i][t]) if k < M]
+                    l1 = [lx[i, k] for k in range(j, j + row_constraints[i][t]) if k < M]
                     if len(l1) > 0:
-                        model.addConstr(line_constraints[i][t] * ly[i, j][t] <= quicksum(keyx for keyx in l1))
+                        model.addConstr(row_constraints[i][t] * ly[i, j][t] <= quicksum(keyx for keyx in l1))
             for t in range(len(column_constraints[j])):
                 if lz[j, i][t]:
                     l1 = []
@@ -137,3 +140,6 @@ def start(file):
     grid, execution_time = solve(line_constraints, column_constraints, grid)
     print("solution found in {:.2} seconds".format(execution_time))
     Plot.plot_grid(grid, file)
+
+    return execution_time
+

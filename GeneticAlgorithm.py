@@ -253,5 +253,9 @@ def start(file):
             divide_to_niches = True
 
     end = time()
+    best_sol=best_in_niche[cur_fittest] / finish_line
+    runtime = end-start
     print("solution found in {:.3} seconds".format(str(end - start)))
     Plot.plot_grid(fittest_sols[cur_fittest][0], file)
+
+    return runtime, best_sol
